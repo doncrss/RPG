@@ -2,95 +2,459 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8" />
-    <title>Mini RPG Batalha</title>
+    <title>Mini RPG Batalha — Tema Medieval</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: Arial; max-width: 600px; margin:2em auto; background:#f4f4f4; }
-        .status { background:white; padding:1em; border-radius:8px; margin-bottom:1em; }
-        .mensagens { background:#222; color:#eee; padding:1em; height:200px; overflow-y:auto; border-radius:8px; margin-bottom:1em; }
-        button { padding:0.7em 1.2em; margin-right:10px; border:none; border-radius:5px; cursor:pointer; }
-        button:hover { background:#ddd; }
+        :root{
+            --bg:#0b0905; --panel:#2e2419; --accent:#d4a017; --danger:#9b2b2b; --muted:#d9cdb9; --parchment:#f3ead2;
+        }
+        *{box-sizing:border-box}
+        body{font-family:Cinzel, serif; margin:0; min-height:100vh; background:linear-gradient(180deg,var(--bg),#231b12); color:#efe6d8; display:flex; align-items:center; justify-content:center; padding:2rem}
+        .container{width:960px; max-width:95%;}
+
+        header{display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem}
+        h1{font-weight:700; margin:0; letter-spacing:1px}
+
+        /* Menu */
+        .menu-btn{background:transparent;border:2px solid rgba(255,255,255,0.06); color:var(--parchment); padding:0.5rem 0.8rem; border-radius:8px; cursor:pointer}
+        .side-menu{position:fixed; right:-360px; top:0; height:100%; width:360px; background:linear-gradient(180deg,#2b1f13,#1c1208); box-shadow:-24px 0 60px rgba(0,0,0,0.7); transition:right .35s cubic-bezier(.2,.9,.2,1); padding:1.6rem; color:var(--parchment)}
+        .side-menu.open{right:0}
+        .side-menu h3{margin-top:0; font-size:1.2rem}
+        .menu-item{padding:0.6rem 0; border-bottom:1px dashed rgba(255,255,255,0.03)}
+
+        /* Arena */
+        .arena{background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent); padding:1rem; border-radius:12px; display:flex; gap:1rem; align-items:center; position:relative; justify-content:center}
+        .card{flex:0 0 300px; background:linear-gradient(180deg,#2b1f13,#261910); padding:1rem; border-radius:10px; position:relative; overflow:visible; box-shadow:0 6px 30px rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.02)}
+        .controls{flex:0 0 360px}
+        .avatar{height:150px; width:150px; border-radius:8px; background:linear-gradient(180deg,#3b2e20,#2b2014); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:1.1rem; box-shadow:inset 0 -6px 18px rgba(0,0,0,0.5)}
+        .meta{margin-top:0.8rem}
+        .hp-bar{height:16px; background:rgba(0,0,0,0.25); border-radius:8px; overflow:hidden; border:1px solid rgba(255,255,255,0.03)}
+        .hp-fill{height:100%; background:linear-gradient(90deg,#6ee7b7,#34d399); width:100%; transition:width .45s ease}
+        .hp-text{font-size:0.85rem; color:var(--muted); margin-top:6px}
+
+        /* Center controls and messages */
+        .controls{display:flex; flex-direction:column; gap:10px; align-items:center; justify-content:center}
+        .actions{display:flex; gap:10px}
+        .btn{background:linear-gradient(180deg,#4b3827,#3a2b1f); padding:0.6rem 1rem; border-radius:8px; border:1px solid rgba(0,0,0,0.3); cursor:pointer; color:var(--parchment)}
+        .btn.primary{background:linear-gradient(90deg,var(--accent),#c98f12); color:#20180e}
+        .btn.danger{background:linear-gradient(90deg,#8b2e2e,#6b1f1f);}
+
+        /* Mensagens */
+        .mensagens{background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(0,0,0,0.02)); height:140px; overflow:auto; padding:0.8rem; border-radius:8px; font-size:0.95rem; color:var(--parchment)}
+
+        /* Canvas for particles */
+        #fxCanvas{position:absolute; left:0; top:0; pointer-events:none}
+
+        /* Attack animations */
+        .shake{animation:shake .45s ease}
+        @keyframes shake{0%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}100%{transform:translateX(0)}}
+
+        .floating-damage{position:absolute; font-weight:700; color:var(--danger); font-size:1.2rem; text-shadow:0 4px 12px rgba(0,0,0,0.6); transform:translateY(0); opacity:1; transition:transform 900ms ease, opacity 900ms ease}
+
+        footer{margin-top:0.8rem; text-align:center; color:var(--muted); font-size:0.85rem}
+        @media(max-width:800px){.arena{flex-direction:column} .avatar{height:120px;width:120px}}
     </style>
 </head>
 <body>
-<h1>Mini RPG - Batalha</h1>
+<div class="container">
+    <header>
+        <h1>Mini RPG — Batalha</h1>
+        <div id="arcadeScore" style="font-size:0.95rem;color:var(--muted);margin-right:12px">Arcade: 0</div>
+        <div>
+            <button class="menu-btn" id="openMenu">☰ Menu</button>
+        </div>
+    </header>
 
-<div class="status" id="status">
-    <!-- Status será atualizado via JS -->
+    <div class="arena" id="arena" style="position:relative;">
+        <div class="card" id="playerCard">
+            <div style="display:flex;gap:1rem;align-items:center">
+                <div style="display:flex;flex-direction:column;align-items:flex-start;gap:6px">
+                    <div class="avatar" id="playerAvatar">
+                        <!-- Stickman player -->
+                        <svg width="110" height="110" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                            <circle cx="32" cy="14" r="6" fill="#efe6d8" stroke="#6b4a2e"/>
+                            <line x1="32" y1="20" x2="32" y2="36" stroke="#efe6d8" stroke-width="3" stroke-linecap="round"/>
+                            <line x1="32" y1="24" x2="22" y2="30" stroke="#efe6d8" stroke-width="3" stroke-linecap="round"/>
+                            <line x1="32" y1="24" x2="42" y2="30" stroke="#efe6d8" stroke-width="3" stroke-linecap="round"/>
+                            <line x1="32" y1="36" x2="24" y2="50" stroke="#efe6d8" stroke-width="3" stroke-linecap="round"/>
+                            <line x1="32" y1="36" x2="40" y2="50" stroke="#efe6d8" stroke-width="3" stroke-linecap="round"/>
+                        </svg>
+                    </div>
+                    <div id="playerWeapon" style="height:28px"></div>
+                </div>
+                <div class="meta">
+                    <div id="playerName">Herói</div>
+                    <div id="playerClass" style="font-size:0.85rem;color:var(--muted)"></div>
+                    <div class="hp-bar" style="width:220px;margin-top:8px"><div id="playerHpFill" class="hp-fill"></div></div>
+                    <div class="hp-text" id="playerHpText">HP: 120/120 • Poções: 1</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="actions">
+                <button class="btn" id="atkBtn">Ataque</button>
+                <button class="btn primary" id="specBtn">Especial</button>
+                <button class="btn" id="magiaBtn">Magia</button>
+                <button class="btn" id="pocaoBtn">Poção</button>
+                <button class="btn danger" id="rebootBtn">Reiniciar</button>
+            </div>
+            <div class="mensagens" id="mensagens"></div>
+        </div>
+
+        <div class="card" id="enemyCard" style="text-align:right">
+            <div style="display:flex;gap:1rem;align-items:center;justify-content:flex-end">
+                <div class="meta" style="text-align:right">
+                    <div id="enemyName">Inimigo</div>
+                    <div id="enemyClass" style="font-size:0.85rem;color:var(--muted)"></div>
+                    <div class="hp-bar" style="width:220px;margin-top:8px;margin-left:auto"><div id="enemyHpFill" class="hp-fill" style="background:linear-gradient(90deg,#f87171,#fb7185)"></div></div>
+                    <div class="hp-text" id="enemyHpText">HP: 100/100</div>
+                </div>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+                    <div id="enemyWeapon" style="height:28px"></div>
+                    <div class="avatar" id="enemyAvatar">
+                        <!-- Stickman enemy -->
+                        <svg width="110" height="110" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                            <circle cx="32" cy="14" r="6" fill="#9fbf7e" stroke="#2f4a2a"/>
+                            <line x1="32" y1="20" x2="32" y2="36" stroke="#9fbf7e" stroke-width="3" stroke-linecap="round"/>
+                            <line x1="32" y1="24" x2="22" y2="30" stroke="#9fbf7e" stroke-width="3" stroke-linecap="round"/>
+                            <line x1="32" y1="24" x2="42" y2="30" stroke="#9fbf7e" stroke-width="3" stroke-linecap="round"/>
+                            <line x1="32" y1="36" x2="24" y2="50" stroke="#9fbf7e" stroke-width="3" stroke-linecap="round"/>
+                            <line x1="32" y1="36" x2="40" y2="50" stroke="#9fbf7e" stroke-width="3" stroke-linecap="round"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <canvas id="fxCanvas"></canvas>
+    </div>
+
+    <footer>Toque nos botões para ver animações: projéteis, partículas e efeitos sonoros.</footer>
 </div>
 
-<div class="mensagens" id="mensagens">
-    <!-- Mensagens aparecerão aqui -->
+<!-- Modal obrigatório de seleção de classe (aparece primeiro) -->
+<div id="classModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:99999">
+    <div style="width:520px;max-width:95%;background:linear-gradient(180deg,#2b1f13,#261910);padding:20px;border-radius:12px;border:1px solid rgba(255,255,255,0.03);color:var(--parchment)">
+        <h2 style="margin:0 0 8px">Selecione sua classe antes de começar</h2>
+        <p style="margin:0 0 12px;color:var(--muted)">Escolha uma classe e clique em <strong>Selecionar e Começar</strong>.</p>
+        <div style="display:flex;gap:12px">
+            <div style="flex:1">
+                <label style="display:block"><input type="radio" name="modalClasse" value="Guerreiro"> <strong>Guerreiro</strong></label>
+                <div style="font-size:0.85rem;color:var(--muted);margin-bottom:8px">Vida alta, defesa sólida, ataque consistente. Especial: Golpe forte.</div>
+                <label style="display:block"><input type="radio" name="modalClasse" value="Mago"> <strong>Mago</strong></label>
+                <div style="font-size:0.85rem;color:var(--muted);margin-bottom:8px">Dano mágico elevado, magias: <em>magia</em> e <em>feitiço</em>.</div>
+                <label style="display:block"><input type="radio" name="modalClasse" value="Arqueiro"> <strong>Arqueiro</strong></label>
+                <div style="font-size:0.85rem;color:var(--muted)">Equilíbrio entre ataque/distância; dano crítico com especial.</div>
+            </div>
+            <div style="width:160px;display:flex;flex-direction:column;align-items:center;justify-content:center">
+                <button class="btn primary" id="modalApplyBtn" style="width:100%">Selecionar e Começar</button>
+                <button class="btn" id="modalInfoBtn" style="margin-top:10px;width:100%">Ajuda</button>
+            </div>
+        </div>
+
+            <!-- Modal de opções de ataque (abre para qualquer tipo de ação) -->
+            <div id="attackModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.75);display:none;align-items:center;justify-content:center;z-index:100000">
+                <div style="width:520px;max-width:95%;background:linear-gradient(180deg,#2b1f13,#261910);padding:20px;border-radius:12px;border:1px solid rgba(255,255,255,0.03);color:var(--parchment)">
+                    <h3 id="attackModalTitle" style="margin:0 0 8px">Escolha uma opção</h3>
+                    <div id="attackOptions" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px"></div>
+                    <div style="display:flex;gap:8px;justify-content:flex-end">
+                        <button class="btn" id="attackCancelBtn">Cancelar</button>
+                    </div>
+                </div>
+            </div>
+    </div>
 </div>
 
-<div>
-    <button onclick="acao('ataque')">Ataque Normal</button>
-    <button onclick="acao('especial')">Ataque Especial</button>
-    <button onclick="acao('pocao')">Usar Poção</button>
-    <button onclick="reiniciar()" style="background:#f66;color:white">Reiniciar Batalha</button>
-</div>
+<aside class="side-menu" id="sideMenu">
+    <h3>Menu</h3>
+    <div class="menu-item">Inventário: <strong id="menuPocoes">Poções: 1</strong></div>
+    <div class="menu-item">Escolha sua classe:</div>
+    <div class="menu-item" style="display:flex;flex-direction:column;gap:8px">
+        <label><input type="radio" name="classe" value="Guerreiro"> <strong>Guerreiro</strong></label>
+        <div style="font-size:0.85rem;color:var(--muted)">Vida alta, defesa sólida, ataque consistente. Especial: Golpe forte.</div>
+        <label><input type="radio" name="classe" value="Mago"> <strong>Mago</strong></label>
+        <div style="font-size:0.85rem;color:var(--muted)">Dano mágico elevado, maior variância. Magias: <em>magia</em> e <em>feitiço</em>.</div>
+        <label><input type="radio" name="classe" value="Arqueiro"> <strong>Arqueiro</strong></label>
+        <div style="font-size:0.85rem;color:var(--muted)">Equilíbrio entre ataque/distância; dano crítico com especial.</div>
+        <div style="display:flex;gap:8px;margin-top:6px">
+            <button class="btn" id="applyClassBtn">Aplicar e Reiniciar</button>
+            <button class="btn" id="resetClassBtn">Reiniciar sem mudar</button>
+        </div>
+    </div>
+    <div class="menu-item">Tema: <button class="btn" id="toggleTheme">Alternar</button></div>
+    <div class="menu-item">Velocidade de Animação: <input id="speedRange" type="range" min="0.5" max="2" step="0.1" value="1"></div>
+    <div style="margin-top:1rem"><button class="btn" id="closeMenu">Fechar</button></div>
+</aside>
 
 <script>
 const API_BASE = 'http://127.0.0.1:8000';
+console.log('batalha.html script carregado');
+window.addEventListener('error', (e)=>{ console.error('Global error captured:', e.message, e.error); });
+// Listener global para diagnosticar cliques que não chegam aos handlers
+document.addEventListener('click', (e)=>{
+    try{
+        const id = e.target && e.target.id ? e.target.id : (e.target && e.target.className ? e.target.className : '(no-id)');
+        console.log('GLOBAL CLICK ->', id, 'disabled?', e.target && e.target.disabled ? true : false);
+    }catch(err){ console.error('click-log error', err); }
+}, true);
+let previousState = null;
+const playerHpFill = document.getElementById('playerHpFill');
+const enemyHpFill = document.getElementById('enemyHpFill');
+const playerHpText = document.getElementById('playerHpText');
+const enemyHpText = document.getElementById('enemyHpText');
+const mensagensDiv = document.getElementById('mensagens');
+const fxCanvas = document.getElementById('fxCanvas');
+const arena = document.getElementById('arena');
+const playerCard = document.getElementById('playerCard');
+const enemyCard = document.getElementById('enemyCard');
+const menu = document.getElementById('sideMenu');
+const openMenu = document.getElementById('openMenu');
+const closeMenu = document.getElementById('closeMenu');
+const menuPocoes = document.getElementById('menuPocoes');
 
-async function carregarBatalha() {
+fxCanvas.width = arena.clientWidth;
+fxCanvas.height = arena.clientHeight;
+fxCanvas.style.width = arena.clientWidth + 'px';
+fxCanvas.style.height = arena.clientHeight + 'px';
+fxCanvas.style.left = arena.offsetLeft + 'px';
+fxCanvas.style.top = arena.offsetTop + 'px';
+
+window.addEventListener('resize', ()=>{
+    fxCanvas.width = arena.clientWidth; fxCanvas.height = arena.clientHeight;
+    fxCanvas.style.width = arena.clientWidth + 'px'; fxCanvas.style.height = arena.clientHeight + 'px';
+});
+
+// Simple particle system
+const ctx = fxCanvas.getContext('2d');
+let particles = [];
+function spawnParticles(x,y,color,count=18){
+    for(let i=0;i<count;i++) particles.push({x,y,vx:(Math.random()-0.5)*6, vy:(Math.random()-1.8)*6, life:60+Math.random()*40, color});
+}
+function renderParticles(){
+    ctx.clearRect(0,0,fxCanvas.width,fxCanvas.height);
+    for(let i=particles.length-1;i>=0;i--){
+        const p = particles[i];
+        p.x += p.vx; p.y += p.vy; p.vy += 0.15; p.life--;
+        ctx.globalAlpha = Math.max(0, p.life/100);
+        ctx.fillStyle = p.color;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 3,0,Math.PI*2); ctx.fill();
+        if(p.life<=0) particles.splice(i,1);
+    }
+    requestAnimationFrame(renderParticles);
+}
+renderParticles();
+
+// WebAudio effects
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function playHit(type='small'){
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = (type==='big')? 'sawtooth' : 'square';
+    o.frequency.value = (type==='big')? 120 : 300;
+    g.gain.value = 0.0001;
+    o.connect(g); g.connect(audioCtx.destination);
+    const now = audioCtx.currentTime;
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(0.12, now+0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, now+0.4);
+    o.start(); o.stop(now+0.45);
+}
+
+// UI: menu
+openMenu.onclick = ()=> menu.classList.add('open');
+closeMenu.onclick = ()=> menu.classList.remove('open');
+
+document.getElementById('toggleTheme').onclick = ()=> alert('Tema alternado (placeholder)');
+
+// Helpers
+function setStatus(data){
+    const jogador = data.jogador; const inimigo = data.inimigo;
+    const pPct = Math.max(0, jogador.vida) / jogador.vida_max * 100;
+    const ePct = Math.max(0, inimigo.vida) / inimigo.vida_max * 100;
+    playerHpFill.style.width = pPct + '%';
+    enemyHpFill.style.width = ePct + '%';
+    playerHpText.textContent = `HP: ${jogador.vida}/${jogador.vida_max} • Poções: ${jogador.pocoes}`;
+    enemyHpText.textContent = `HP: ${inimigo.vida}/${inimigo.vida_max}`;
+    menuPocoes.textContent = `Poções: ${jogador.pocoes}`;
+    mensagensDiv.innerHTML = '';
+    data.mensagens.forEach(msg=>{ const p=document.createElement('div'); p.textContent = msg; mensagensDiv.appendChild(p); });
+    mensagensDiv.scrollTop = mensagensDiv.scrollHeight;
+
+    // Atualiza ícones de arma/classe se disponíveis
+    const playerWeaponEl = document.getElementById('playerWeapon');
+    const enemyWeaponEl = document.getElementById('enemyWeapon');
+    if(playerWeaponEl){ playerWeaponEl.innerHTML = weaponIcon(jogador.arma || jogador.classe); }
+    if(enemyWeaponEl){ enemyWeaponEl.innerHTML = weaponIcon(inimigo.arma || inimigo.classe); }
+
+    // Atualiza nomes e classes visíveis
+    const playerNameEl = document.getElementById('playerName');
+    const enemyNameEl = document.getElementById('enemyName');
+    const playerClassEl = document.getElementById('playerClass');
+    const enemyClassEl = document.getElementById('enemyClass');
+    if(playerNameEl) playerNameEl.textContent = jogador.nome;
+    if(enemyNameEl) enemyNameEl.textContent = inimigo.nome;
+    if(playerClassEl) playerClassEl.textContent = jogador.classe ? `Classe: ${jogador.classe}` : '';
+    if(enemyClassEl) enemyClassEl.textContent = inimigo.classe ? `Classe: ${inimigo.classe}` : '';
+    // Atualiza placar arcade quando disponível
+    const as = document.getElementById('arcadeScore'); if(as) as.textContent = `Arcade: ${data.arcade_score || 0}`;
+}
+
+function weaponIcon(name){
+    if(!name) return '';
+    name = name.toLowerCase();
+    if(name.includes('espada') || name.includes('espada') || name.includes('sword')){
+        return `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 22l2-2 12-12 2 2L6 22H2z" fill="#caa052"/><path d="M17 3l4 4-2 2-4-4 2-2z" fill="#8b5e2b"/></svg>`;
+    }
+    if(name.includes('cajado') || name.includes('staff') || name.includes('mago')){
+        return `<svg width="28" height="28" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="11" y="2" width="2" height="14" fill="#8b5e2b"/><circle cx="12" cy="18" r="3" fill="#ffd27a"/></svg>`;
+    }
+    if(name.includes('arco') || name.includes('bow') || name.includes('arqueiro')){
+        return `<svg width="28" height="28" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 12c0 4 3 7 7 7" stroke="#caa052" stroke-width="2" fill="none"/><path d="M21 12c0-4-3-7-7-7" stroke="#8b5e2b" stroke-width="2" fill="none"/><line x1="5" y1="5" x2="19" y2="19" stroke="#e6d6a3" stroke-width="2"/></svg>`;
+    }
+    // default icon
+    return `<svg width="28" height="28" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="6" fill="#caa052"/></svg>`;
+}
+
+// Classe selection handlers
+    // inicial: desabilita ações até aplicar classe
+    const actionButtons = ['atkBtn','specBtn','magiaBtn','pocaoBtn'];
+    function setActionsEnabled(enabled){ console.log('setActionsEnabled ->', enabled); for(const id of actionButtons){ const el=document.getElementById(id); if(el) el.disabled = !enabled; } }
+    setActionsEnabled(false);
+
+    document.getElementById('applyClassBtn').onclick = async ()=>{
+    const radios = document.getElementsByName('classe');
+    let escolha = null;
+    for(const r of radios) if(r.checked) escolha = r.value;
+    if(!escolha){ alert('Escolha uma classe antes de aplicar.'); return; }
+    try{
+        const resp = await fetch(`${API_BASE}/selecionar_classe/${escolha}`,{method:'POST'});
+        if(!resp.ok){ const err = await resp.json(); alert(err.detail); return; }
+        const data = await resp.json(); previousState = JSON.parse(JSON.stringify(data)); setStatus(data);
+        menu.classList.remove('open');
+        setActionsEnabled(true);
+    }catch(e){ console.error(e); }
+}
+document.getElementById('resetClassBtn').onclick = async ()=>{
+    const resp = await fetch(`${API_BASE}/reiniciar`,{method:'POST'}); const data = await resp.json(); previousState = JSON.parse(JSON.stringify(data)); setStatus(data); menu.classList.remove('open');
+    // manter ações desabilitadas até aplicar classe explicitamente
+    setActionsEnabled(false);
+}
+
+// Modal handlers (obrigatório)
+document.getElementById('modalApplyBtn').onclick = async ()=>{
+    const radios = document.getElementsByName('modalClasse');
+    let escolha = null;
+    for(const r of radios) if(r.checked) escolha = r.value;
+    if(!escolha){ alert('Escolha uma classe antes de começar.'); return; }
+    try{
+        const resp = await fetch(`${API_BASE}/selecionar_classe/${escolha}`,{method:'POST'});
+        if(!resp.ok){ const err = await resp.json(); alert(err.detail); return; }
+        const data = await resp.json(); previousState = JSON.parse(JSON.stringify(data)); setStatus(data);
+        // esconder modal e habilitar ações
+        document.getElementById('classModal').style.display = 'none';
+        setActionsEnabled(true);
+    }catch(e){ console.error(e); }
+}
+document.getElementById('modalInfoBtn').onclick = ()=>{ alert('Escolha uma classe para começar. Guerreiros têm alta vida; Magos têm magias; Arqueiros são equilibrados.'); }
+
+async function carregarBatalha(){
     const res = await fetch(`${API_BASE}/batalha`);
     const data = await res.json();
-    atualizarStatus(data);
+    previousState = JSON.parse(JSON.stringify(data));
+    setStatus(data);
 }
 
-async function acao(tipo) {
-    try {
-        const res = await fetch(`${API_BASE}/acao/${tipo}`, { method: 'POST' });
-        if (!res.ok) {
-            const err = await res.json();
-            alert(err.detail);
-            return;
-        }
-        const data = await res.json();
-        atualizarStatus(data);
-    } catch (e) {
-        console.error("Erro na ação:", e);
-    }
-}
+// Animation when performing action
+async function acao(tipo, opc=null){
+    // fire animation from player to enemy
+    const playerRect = playerCard.getBoundingClientRect();
+    const enemyRect = enemyCard.getBoundingClientRect();
+    const start = {x: playerRect.left + playerRect.width*0.8 - arena.getBoundingClientRect().left, y: playerRect.top + playerRect.height*0.4 - arena.getBoundingClientRect().top};
+    const end = {x: enemyRect.left + enemyRect.width*0.2 - arena.getBoundingClientRect().left, y: enemyRect.top + enemyRect.height*0.4 - arena.getBoundingClientRect().top};
 
-async function reiniciar() {
-    try {
-        const res = await fetch(`${API_BASE}/reiniciar`, { method: 'POST' });
-        if (!res.ok) {
-            const err = await res.json();
-            alert(err.detail || 'Erro ao reiniciar');
-            return;
-        }
-        const data = await res.json();
-        atualizarStatus(data);
-    } catch (e) {
-        console.error('Erro ao reiniciar:', e);
-    }
-}
+    // create projectile element
+    const proj = document.createElement('div');
+    proj.style.position='absolute'; proj.style.left = start.x+'px'; proj.style.top = start.y+'px'; proj.style.width='18px'; proj.style.height='18px'; proj.style.borderRadius='50%'; proj.style.zIndex=9999;
+    if(tipo==='especial'){ proj.style.background='radial-gradient(circle,#ffd27a,#ff6b6b)'; }
+    else proj.style.background='radial-gradient(circle,#c7f9ff,#34d399)';
+    arena.appendChild(proj);
 
-function atualizarStatus(data) {
-    const statusDiv = document.getElementById('status');
-    const mensagensDiv = document.getElementById('mensagens');
+    // animate projectile
+    const frames = 30; let t=0;
+    return new Promise(async resolve=>{
+        const anim = setInterval(()=>{
+            t++; const pct = t/frames; const x = start.x + (end.x-start.x)*pct; const y = start.y + (end.y-start.y)*pct - Math.sin(pct*Math.PI)*40*(tipo==='especial'?1.2:0.6);
+            proj.style.left = x+'px'; proj.style.top = y+'px';
+            if(t>=frames){ clearInterval(anim); proj.remove(); resolve(); }
+        }, 12);
+            try{
+                const resp = await fetch(`${API_BASE}/acao/${tipo}`,{method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(opc?{opcao:opc}: {})});
+            if(!resp.ok){ const err=await resp.json(); alert(err.detail); return; }
+            const data = await resp.json();
+            // small delay to sync visual impact
+            setTimeout(()=>{
+                // compute damage by comparing previousState
+                const prevEnemy = previousState.inimigo; const newEnemy = data.inimigo;
+                const enemyDmg = (prevEnemy.vida - newEnemy.vida) || 0;
+                if(enemyDmg>0){ playHit(tipo==='especial'?'big':'small'); spawnParticles(end.x, end.y, tipo==='especial'? '#ffb86b' : '#38bdf8', 28); showFloatingDamage(end.x,end.y, enemyDmg); enemyCard.classList.add('shake'); setTimeout(()=>enemyCard.classList.remove('shake'),450); }
 
-    const jogador = data.jogador;
-    const inimigo = data.inimigo;
+                // enemy turn: compare previous player and new player
+                const prevPlayer = previousState.jogador; const newPlayer = data.jogador;
+                const playerDmg = (prevPlayer.vida - newPlayer.vida) || 0;
+                if(playerDmg>0){ playHit('small'); spawnParticles(start.x, start.y, '#ff6b6b', 18); showFloatingDamage(start.x,start.y, playerDmg); playerCard.classList.add('shake'); setTimeout(()=>playerCard.classList.remove('shake'),450); }
 
-    statusDiv.innerHTML = `
-        <strong>Você:</strong> ${jogador.nome} | HP: ${jogador.vida}/${jogador.vida_max} | Poções: ${jogador.pocoes}<br>
-        <strong>Inimigo:</strong> ${inimigo.nome} | HP: ${inimigo.vida}/${inimigo.vida_max} | Poções: ${inimigo.pocoes}
-    `;
-
-    mensagensDiv.innerHTML = '';
-    data.mensagens.forEach(msg => {
-        const p = document.createElement('p');
-        p.textContent = msg;
-        mensagensDiv.appendChild(p);
+                previousState = JSON.parse(JSON.stringify(data));
+                setStatus(data);
+                resolve();
+            }, 160);
+        }catch(e){ console.error(e); }
     });
-
-    mensagensDiv.scrollTop = mensagensDiv.scrollHeight;
 }
 
-// Carrega o estado inicial ao abrir a página
+function showFloatingDamage(x,y,val){
+    const el = document.createElement('div'); el.className='floating-damage'; el.style.left = (x)+'px'; el.style.top = (y)+'px'; el.textContent = `-${val}`;
+    arena.appendChild(el);
+    requestAnimationFrame(()=>{ el.style.transform='translateY(-60px)'; el.style.opacity='0'; });
+    setTimeout(()=>el.remove(),900);
+}
+// Modal de opções de ataque: gera botões conforme tipo/classe
+function openAttackModal(tipo){
+    console.log('openAttackModal called for', tipo);
+    const modal = document.getElementById('attackModal');
+    const title = document.getElementById('attackModalTitle');
+    const optionsEl = document.getElementById('attackOptions');
+    optionsEl.innerHTML = '';
+    title.textContent = `Opções para: ${tipo}`;
+    const jogadorClasse = previousState && previousState.jogador && previousState.jogador.classe ? previousState.jogador.classe : '';
+    let opts = [];
+    if(tipo === 'ataque') opts = [['corte','Corte — Rápido'],['golpe_forte','Golpe Forte — Potente'],['preciso','Ataque Preciso — +Crítico']];
+    else if(tipo === 'especial'){
+        if(jogadorClasse.toLowerCase().includes('guerreiro')) opts = [['furia','Fúria — Multiplos golpes'],['investida','Investida — Empurra']];
+        else if(jogadorClasse.toLowerCase().includes('arqueiro')) opts = [['tiro_preciso','Tiro Preciso — Alto acerto'],['chuva','Chuva de Flechas — AoE']];
+        else opts = [['bola','Bola de Fogo — Explosão'],['impacto','Impacto Arcano — Padrão']];
+    }else if(tipo === 'magia') opts = [['raio','Raio — Dano consistente'],['bola_de_fogo','Bola de Fogo — Alto dano'],['curar','Curar — Recupera vida']];
+    else if(tipo === 'pocao') opts = [['usar','Usar Poção']];
+    for(const o of opts){ const btn=document.createElement('button'); btn.className='btn'; btn.textContent=o[1]; btn.onclick=()=>{ console.log('attack option chosen', tipo, o[0]); modal.style.display='none'; acao(tipo, o[0]); }; optionsEl.appendChild(btn); }
+    document.getElementById('attackCancelBtn').onclick = ()=>{ modal.style.display='none'; };
+    // garantir que o modal esteja no topo do documento (evita problemas de stacking context)
+    if(modal.parentElement !== document.body) document.body.appendChild(modal);
+    modal.style.zIndex = '100000';
+    modal.style.display = 'flex';
+    // notificação visual temporária para depuração (remove automaticamente)
+    const dbg = document.createElement('div'); dbg.textContent = 'Modal aberto'; dbg.style.position='fixed'; dbg.style.right='12px'; dbg.style.top='12px'; dbg.style.padding='8px 12px'; dbg.style.background='rgba(255,255,255,0.12)'; dbg.style.border='1px solid rgba(255,255,255,0.06)'; dbg.style.borderRadius='6px'; dbg.style.zIndex='100001'; document.body.appendChild(dbg); setTimeout(()=>dbg.remove(),1300);
+}
+
+const atkBtn = document.getElementById('atkBtn'); if(atkBtn) atkBtn.onclick = ()=> { console.log('atkBtn clicked'); openAttackModal('ataque'); };
+const specBtn = document.getElementById('specBtn'); if(specBtn) specBtn.onclick = ()=> { console.log('specBtn clicked'); openAttackModal('especial'); };
+const magiaBtn = document.getElementById('magiaBtn'); if(magiaBtn) magiaBtn.onclick = ()=> { console.log('magiaBtn clicked'); openAttackModal('magia'); };
+const pocaoBtn = document.getElementById('pocaoBtn'); if(pocaoBtn) pocaoBtn.onclick = ()=> { console.log('pocaoBtn clicked'); openAttackModal('pocao'); };
+document.getElementById('rebootBtn').onclick = async ()=>{
+    const res = await fetch(`${API_BASE}/reiniciar`,{method:'POST'}); const data = await res.json(); previousState = JSON.parse(JSON.stringify(data)); setStatus(data);
+}
+
+// inicializa
 carregarBatalha();
 </script>
 </body>
